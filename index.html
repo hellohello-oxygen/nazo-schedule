@@ -242,7 +242,7 @@ function validateNickname(name) {
     actionArea.innerHTML = '';
 
 } else {                actionArea.innerHTML = '';
-            } else {
+        
                 nameDisplay.textContent = targetNickname;
                 if (myFollowing.includes(targetNickname)) {
                     actionArea.innerHTML = `<button onclick="toggleFollowDirect('${targetNickname}')" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-2.5 py-1 rounded-md font-medium transition">フォロー解除</button>`;
