@@ -94,7 +94,7 @@
                                 <th class="p-4">公演・団体</th>
                                 <th class="p-4">日時 / 会場</th>
                                 <th class="p-4">参加メンバー</th>
-                                <th class="p-4 text-right">操作</th>
+                                <th class="p-4 text-right">操作 / 削除</th>
                             </tr>
                         </thead>
                         <tbody id="schedule-list-tbody" class="divide-y divide-slate-100 text-sm">
@@ -181,7 +181,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC25ccFc1wQGABP0bkep1NWsQZlS0hj-AI",
@@ -263,6 +263,12 @@
                     });
                 }
 
+                // 作成者本人だけ削除ボタンを有効にする
+                const isCreatedByMe = event.created_by === currentNickname;
+                const deleteBtnHtml = isCreatedByMe 
+                    ? `<button onclick="deleteEvent('${key}')" class="text-xs text-red-500 hover:text-red-700 ml-2 font-medium bg-red-50 hover:bg-red-100 px-2 py-1.5 rounded-lg transition" title="公演を削除"><i class="fa-solid fa-trash-can"></i> 削除</button>`
+                    : '';
+
                 const row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 transition";
                 row.innerHTML = `
@@ -270,6 +276,7 @@
                         <div class="font-bold text-slate-900">${escapeHtml(event.title)}</div>
                         <div class="text-xs text-slate-500">${escapeHtml(event.organizer || '不明・その他')}</div>
                         ${event.memo ? `<div class="text-xs bg-slate-100 text-slate-600 p-2 rounded-lg mt-1 max-w-md"><i class="fa-solid fa-comment text-slate-400 mr-1"></i>${escapeHtml(event.memo)}</div>` : ''}
+                        <div class="text-[10px] text-slate-400 mt-1">追加者: ${escapeHtml(event.created_by || '匿名')}</div>
                     </td>
                     <td class="p-4">
                         <div class="font-medium text-slate-700"><i class="fa-regular fa-calendar mr-1"></i>${event.date} ${event.time || ''}</div>
@@ -279,12 +286,15 @@
                         <div class="flex flex-wrap gap-1">${membersHtml || '<span class="text-xs text-slate-400">参加者なし</span>'}</div>
                     </td>
                     <td class="p-4 text-right">
-                        <select onchange="updateStatus('${key}', this.value)" class="text-xs bg-white border border-slate-300 rounded-lg p-1.5 focus:ring-2 focus:ring-teal-500">
-                            <option value="" ${myStatus === '' ? 'selected' : ''}>▼ 参加表明する</option>
-                            <option value="going" ${myStatus === 'going' ? 'selected' : ''}>🟢 行く</option>
-                            <option value="recruiting" ${myStatus === 'recruiting' ? 'selected' : ''}>🟡 メンバー募集中</option>
-                            <option value="interested" ${myStatus === 'interested' ? 'selected' : ''}>🔵 興味あり</option>
-                        </select>
+                        <div class="flex items-center justify-end space-x-1">
+                            <select onchange="updateStatus('${key}', this.value)" class="text-xs bg-white border border-slate-300 rounded-lg p-1.5 focus:ring-2 focus:ring-teal-500">
+                                <option value="" ${myStatus === '' ? 'selected' : ''}>▼ 参加表明する</option>
+                                <option value="going" ${myStatus === 'going' ? 'selected' : ''}>🟢 行く</option>
+                                <option value="recruiting" ${myStatus === 'recruiting' ? 'selected' : ''}>🟡 メンバー募集中</option>
+                                <option value="interested" ${myStatus === 'interested' ? 'selected' : ''}>🔵 興味あり</option>
+                            </select>
+                            ${deleteBtnHtml}
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -420,11 +430,31 @@
             const newEventRef = push(eventsRef);
             set(newEventRef, {
                 title, organizer, date, time, location, memo,
+                created_by: currentNickname, // 誰が追加したかを保存
                 created_at: Date.now()
             }).then(() => {
                 closeAddModal();
                 document.getElementById('form-add-event').reset();
             });
+        };
+
+        // 公演削除処理（本人チェックあり）
+        window.deleteEvent = function(eventKey) {
+            const event = allEvents[eventKey];
+            if (!event) return;
+
+            if (event.created_by !== currentNickname) {
+                return alert('この公演は、追加した本人しか削除できません。');
+            }
+
+            if (confirm(`「${event.title}」のスケジュールを完全に削除しますか？\n（他の人の参加表明データもすべて消去されます）`)) {
+                const singleEventRef = ref(db, `events/${eventKey}`);
+                remove(singleEventRef).then(() => {
+                    alert('削除が完了しました。');
+                }).catch((error) => {
+                    alert('削除に失敗しました: ' + error.message);
+                });
+            }
         };
 
         function updateMyStatusSummary() {
